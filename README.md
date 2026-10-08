@@ -3,7 +3,7 @@
 ## Student Details
 
 - **Full Name:** Colby Garner
-- **CCID:** `<Enter ccid>`
+- **CCID:** garner1
 
 ## References and Resources
 

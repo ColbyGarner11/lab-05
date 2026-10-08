@@ -1,6 +1,6 @@
 package com.example.listycity
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,11 +11,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +36,7 @@ fun CityListScreen(
     cities: List<City>,
     onAddCity: (City) -> Unit,
     onUpdateCity: (City, City) -> Unit,
+    onDeleteCity: (City) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var newCityName by remember { mutableStateOf("") }
@@ -40,6 +45,36 @@ fun CityListScreen(
     var selectedCity by remember { mutableStateOf<City?>(null) }
     var editedCityName by remember { mutableStateOf("") }
     var editedProvinceName by remember { mutableStateOf("") }
+    var cityPendingDelete by remember { mutableStateOf<City?>(null) }
+
+    // Ask before deleting, since a delete is removed from Firestore for good.
+    cityPendingDelete?.let { city ->
+        AlertDialog(
+            onDismissRequest = { cityPendingDelete = null },
+            title = { Text("Delete city?") },
+            text = { Text("Remove ${city.name}, ${city.province} from the list?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteCity(city)
+                        if (selectedCity == city) {
+                            selectedCity = null
+                            editedCityName = ""
+                            editedProvinceName = ""
+                        }
+                        cityPendingDelete = null
+                    }
+                ) {
+                    Text("DELETE", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { cityPendingDelete = null }) {
+                    Text("CANCEL")
+                }
+            }
+        )
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         Row(
@@ -154,9 +189,37 @@ fun CityListScreen(
                     Text("UPDATE CITY")
                 }
             }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = {
+                        selectedCity = null
+                        editedCityName = ""
+                        editedProvinceName = ""
+                    }
+                ) {
+                    Text("CANCEL")
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Button(
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    onClick = { cityPendingDelete = selectedCity }
+                ) {
+                    Text("DELETE CITY")
+                }
+            }
         }
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            itemsIndexed(cities) { index, city ->
+            itemsIndexed(cities, key = { _, city -> city.id.ifEmpty { city.name } }) { index, city ->
                 CityRow(
                     city = city,
                     onClick = {
@@ -166,7 +229,8 @@ fun CityListScreen(
                         selectedCity = city
                         editedCityName = city.name
                         editedProvinceName = city.province
-                    }
+                    },
+                    onLongClick = { cityPendingDelete = city }
                 )
                 if (index < cities.lastIndex) {
                     HorizontalDivider()
@@ -180,12 +244,13 @@ fun CityListScreen(
 @Composable
 fun CityRow(
     city: City,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
         Text(
@@ -208,12 +273,13 @@ fun CityListScreenPreview() {
     ListyCityTheme {
         CityListScreen(
             cities = listOf(
-                City("Edmonton", "AB"),
-                City("Vancouver", "BC"),
-                City("Calgary", "AB")
+                City(name = "Edmonton", province = "AB"),
+                City(name = "Vancouver", province = "BC"),
+                City(name = "Calgary", province = "AB")
             ),
             onAddCity = {},
-            onUpdateCity = { _, _ -> }
+            onUpdateCity = { _, _ -> },
+            onDeleteCity = {}
         )
     }
 }
